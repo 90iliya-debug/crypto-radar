@@ -1,0 +1,51 @@
+import streamlit as st
+import requests
+import time
+from datetime import datetime
+
+# Настройки мониторинга
+COINS = {
+    "1000SATS": {"sym": "1000SATSUSDT", "prec": 8, "lev": "3x-5x"},
+    "DOGE":     {"sym": "DOGEUSDT",     "prec": 5, "lev": "5x-10x"},
+    "SHIBA":    {"sym": "SHIBUSDT",     "prec": 8, "lev": "3x-5x"},
+    "LUNC":     {"sym": "LUNCUSDT",     "prec": 7, "lev": "2x-3x"}
+}
+
+st.set_page_config(page_title="1000SATS Web Radar", page_icon="📈")
+
+def get_data(symbol):
+    url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval=15m&limit=50"
+    try:
+        res = requests.get(url).json()
+        return [{"h": float(k[2]), "l": float(k[3]), "c": float(k[4])} for k in res]
+    except: return None
+
+st.title("🚀 1000SATS Smart Money Web Radar")
+st.write(f"Данные обновляются в реальном времени. Сейчас: {datetime.now().strftime('%H:%M:%S')}")
+
+cols = st.columns(2) # Разделим экран на 2 колонки
+
+for i, (name, info) in enumerate(COINS.items()):
+    data = get_data(info['sym'])
+    if data:
+        price = data[-1]['c']
+        ob_low = min([d['l'] for d in data[-20:]])
+        ob_high = max([d['h'] for d in data[-20:]])
+        
+        with cols[i % 2]:
+            st.info(f"### {name}")
+            st.metric("Цена USDT", f"{price:.{info['prec']}f}")
+            
+            if price <= ob_low * 1.002:
+                st.success(f"🟢 СИГНАЛ: LONG | Плечо {info['lev']}")
+            elif price >= ob_high * 0.998:
+                st.error(f"🔴 СИГНАЛ: SHORT | Плечо {info['lev']}")
+            else:
+                st.warning("🔎 Поиск точки входа...")
+            
+            st.write(f"Уровни: 🟢 {ob_low:.{info['prec']}f} | 🔴 {ob_high:.{info['prec']}f}")
+            st.markdown("---")
+
+# Кнопка ручного обновления
+if st.button('Обновить данные'):
+    st.rerun()
